@@ -306,7 +306,7 @@ st.markdown("""
         .title {
             font-size: 28px;
             font-weight: bold;
-            color: red;  /* Thermo Fisher Red */
+            color: #FF0000;  /* Thermo Fisher Red */
             align-items: center;
         }
 
