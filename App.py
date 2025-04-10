@@ -84,7 +84,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Header
-st.markdown("<h1 class='title'><center>Telemetry Analysis</h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='title' style='color: red; text-align: center;'>Telemetry Analysis</h1>", unsafe_allow_html=True)
+
 
 # File Uploader for Text File
 uploaded_file = st.file_uploader("📂 Upload your Telemetry Data file", type=["puc"])
