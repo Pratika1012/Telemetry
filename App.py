@@ -582,7 +582,7 @@ if st.session_state.show_menu:
             """
 
             # Print in console for debugging (optional)
-            print(summary)
+            st.write(summary)
 
             # === Display inside styled Streamlit output box ===
             st.markdown(f"""
