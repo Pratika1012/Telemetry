@@ -259,10 +259,10 @@ if st.session_state.show_menu:
         print(classification_report(y_train, y_pred_train))
 
         print("\n=== Test Classification Report ===")
-        print(classification_report(y_test, y_pred_test))
+        st.write(classification_report(y_test, y_pred_test))
 
         print("\n=== Confusion Matrix (Test) ===")
-        print(confusion_matrix(y_test, y_pred_test))
+        st.write(confusion_matrix(y_test, y_pred_test))
 
         # --- Ensure Date/Time columns are in datetime format ---
         
