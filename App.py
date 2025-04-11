@@ -51,7 +51,7 @@ if st.sidebar.button("Show Telemetry Menu"):
     st.session_state.show_menu = True
 
 # Header
-st.markdown("<h1 class='title'><center>Telemetry Analysis</h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='title',color:red><center>Telemetry Analysis</h1>", unsafe_allow_html=True)
 
 if st.session_state.show_menu:
     uploaded_file = st.file_uploader(" Upload your Telemetry Data file", type=["puc"])
