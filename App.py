@@ -36,7 +36,13 @@ st.markdown("""
         border: 2px solid red;
     }
         body { background-color: #ffffff; color: #000000; }
-        .title { font-size: 28px; font-weight: bold; color:red; text-align: center; }
+       .title {
+        font-size: 28px;
+        font-weight: bold;
+        color: red;
+        text-align: center;
+    }
+
         .output-box { border: 2px solid #e60012; border-radius: 15px; padding: 15px; margin-top: 20px; background: #fff; }
     </style>
 """, unsafe_allow_html=True)
