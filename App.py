@@ -1,3 +1,5 @@
+
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -36,13 +38,7 @@ st.markdown("""
         border: 2px solid red;
     }
         body { background-color: #ffffff; color: #000000; }
-       .title {
-        font-size: 28px;
-        font-weight: bold;
-        color: red;
-        text-align: center;
-    }
-
+        .title { font-size: 28px; font-weight: bold; color: #FF0000; text-align: center; }
         .output-box { border: 2px solid #e60012; border-radius: 15px; padding: 15px; margin-top: 20px; background: #fff; }
     </style>
 """, unsafe_allow_html=True)
@@ -58,8 +54,7 @@ if st.sidebar.button("Show Telemetry Menu"):
     st.session_state.show_menu = True
 
 # Header
-st.markdown("<h1 style='color: red; text-align: center;'>Telemetry Analysis</h1>", unsafe_allow_html=True)
-
+st.markdown("<h1 class='title'><center>Telemetry Analysis</h1>", unsafe_allow_html=True)
 if st.session_state.show_menu:
     uploaded_file = st.file_uploader(" Upload your Telemetry Data file", type=["puc"])
     if uploaded_file is not None:
@@ -90,6 +85,7 @@ if st.session_state.show_menu:
 
         three_months_ago = df['Date/Time'].max() - pd.DateOffset(months=3)
         df = df[df['Date/Time'] >= three_months_ago]
+        st.write(three_months_ago)
 
         df['Diff_RTD_Setpoint'] = df['RTD'] - df['Setpoint']
         start_date = df['Date/Time'].min()
@@ -269,259 +265,331 @@ if st.session_state.show_menu:
         print(confusion_matrix(y_test, y_pred_test))
 
         # --- Ensure Date/Time columns are in datetime format ---
+        
+# --- Ensure Date/Time columns are in datetime format ---
         df['Date/Time'] = pd.to_datetime(df['Date/Time'])
-        flagged['Date/Time'] = pd.to_datetime(flagged['Date/Time'])
 
-        # --- Determine flagged date boundaries ---
-        flagged_start = flagged['Date/Time'].min()
-        flagged_end = flagged['Date/Time'].max()
+        if not flagged.empty:
+            flagged['Date/Time'] = pd.to_datetime(flagged['Date/Time'])
 
-        # --- Define plot boundaries ---
-        plot_start = flagged_start - pd.Timedelta(days=5)
-        plot_end = flagged_end + pd.Timedelta(days=10)
+            # --- Determine flagged date boundaries ---
+            flagged_start = flagged['Date/Time'].min()
+            flagged_end = flagged['Date/Time'].max()
 
-        print("Flagged Start Date:", flagged_start)
-        print("Flagged End Date:", flagged_end)
-        print("Plot Start Date:", plot_start)
-        print("Plot End Date:", plot_end)
+            # --- Define plot boundaries ---
+            plot_start = flagged_start - pd.Timedelta(days=5)
+            plot_end = flagged_end + pd.Timedelta(days=10)
 
-        # --- Filter the full DataFrame for the plotting window ---
-        plot_df = df[(df['Date/Time'] >= plot_start) & (df['Date/Time'] <= plot_end)]
+            print("Flagged Start Date:", flagged_start)
+            print("Flagged End Date:", flagged_end)
+            print("Plot Start Date:", plot_start)
+            print("Plot End Date:", plot_end)
 
-        # --- Columns to include in the plot ---
-        columns_to_plot = ['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']
+            # --- Filter the full DataFrame for the plotting window ---
+            plot_df = df[(df['Date/Time'] >= plot_start) & (df['Date/Time'] <= plot_end)]
 
-        # --- Plotting ---
-        plt.figure(figsize=(16, 8))
+            # --- Columns to include in the plot ---
+            columns_to_plot = ['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']
 
-        for col in columns_to_plot:
-            if col in plot_df.columns:
-                # Convert to numeric to avoid plot issues
-                plot_df[col] = pd.to_numeric(plot_df[col], errors='coerce')
-                plt.plot(plot_df['Date/Time'], plot_df[col], label=col)  # No markers
+            # --- Plotting ---
+            plt.figure(figsize=(16, 8))
 
-        # Format x-axis to show dates in YYYY-MM-DD format
-        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-        plt.xticks(rotation=45)
+            for col in columns_to_plot:
+                if col in plot_df.columns:
+                    # Convert to numeric to avoid plot issues
+                    plot_df[col] = pd.to_numeric(plot_df[col], errors='coerce')
+                    plt.plot(plot_df['Date/Time'], plot_df[col], label=col)
 
-        plt.title(f"Sensor Trend values from {plot_start.date()} to {plot_end.date()}")
-        plt.xlabel("Date")
-        plt.ylabel("Trend Values")
-        plt.legend()
-        plt.tight_layout()
-        plt.show()
-        st.pyplot(plt)
+            # Format x-axis to show dates in YYYY-MM-DD format
+            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            plt.xticks(rotation=45)
 
-        # --- Ensure Date/Time columns are in datetime format ---
-        df['Date/Time'] = pd.to_datetime(df['Date/Time'])
-        flagged['Date/Time'] = pd.to_datetime(flagged['Date/Time'])
+            plt.title(f"Sensor Trend Values from {plot_start.date()} to {plot_end.date()}")
+            plt.xlabel("Date")
+            plt.ylabel("Trend Values")
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
+            st.pyplot(plt)
 
-        # --- Determine flagged date boundaries ---
-        flagged_start = flagged['Date/Time'].min()
-        flagged_end = flagged['Date/Time'].max()
+        else:
+            print("✅ No Issue Detected — Device Operating Normally")
+        
 
-        # --- Define plot boundaries ---
-        plot_start = flagged_start - pd.Timedelta(days=5)
-        plot_end = flagged_end + pd.Timedelta(days=10)
-
-        print("Flagged Start Date:", flagged_start)
-        print("Flagged End Date:", flagged_end)
-        print("Plot Start Date:", plot_start)
-        print("Plot End Date:", plot_end)
-
-        # --- Filter the full DataFrame for the plotting window ---
-        plot_df = df[(df['Date/Time'] >= plot_start) & (df['Date/Time'] <= plot_end)]
-
-        # --- Columns to include in the plot ---
-        columns_to_plot = ['RTD_trend', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']
-
-        # --- Plotting ---
-        plt.figure(figsize=(16, 8))
-
-        for col in columns_to_plot:
-            if col in plot_df.columns:
-                # Convert to numeric to avoid plot issues
-                plot_df[col] = pd.to_numeric(plot_df[col], errors='coerce')
-                plt.plot(plot_df['Date/Time'], plot_df[col], label=col)  # No markers
-
-        # Format x-axis to show dates in YYYY-MM-DD format
-        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-        plt.xticks(rotation=45)
-
-        plt.title(f"Sensor Trend Lines from {plot_start.date()} to {plot_end.date()}")
-        plt.xlabel("Date")
-        plt.ylabel("Trend Lines")
-        plt.legend()
-        plt.tight_layout()
-        plt.show()
-        st.pyplot(plt)
-        # Feature importances
-        importances = clf.feature_importances_
-        feature_names = features
-
-        # Sort importances for better visualization (optional)
-        indices = np.argsort(importances)
-        sorted_features = [feature_names[i] for i in indices]
-        sorted_importances = importances[indices]
-
-        # Plotting
-        plt.figure(figsize=(8, 5))
-        bars = plt.barh(sorted_features, sorted_importances, color='skyblue')
-        plt.xlabel("Feature Importance")
-        plt.title("Random Forest Feature Importance")
-        plt.tight_layout()
-
-        # Annotate bars with importance values
-        for bar in bars:
-            width = bar.get_width()
-            plt.text(width + 0.001, bar.get_y() + bar.get_height() / 2,
-                    f'{width:.2f}', va='center')
-
-        plt.show()
-        st.pyplot(plt)
-
-        # ------------------ STEP 5: GenAI-style Summary Generation ------------------
-        total_rows = len(df)
-        print(total_rows)
-        total_issues = df['Issue_Detected'].sum()
-        print(total_issues)
-        accuracy = clf.score(X_test, y_test) * 100
-        print(accuracy,'%')
-
-        # List of columns you're interested in
-        columns_to_check = ['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6',
-                            'RTD_trend', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']
-
-        # Prepare a list to store results
-        summary = []
-
-        # Loop through each column and collect stats
-        for col in columns_to_check:
-            min_val = flagged[col].min()
-            max_val = flagged[col].max()
-            mean_val = flagged[col].mean()
-            min_date = flagged.loc[flagged[col].idxmin(), 'Date/Time']
-            max_date = flagged.loc[flagged[col].idxmax(), 'Date/Time']
+            # --- Ensure Date/Time columns are in datetime format ---
             
-            summary.append({
-                'Column': col,
-                'Min': min_val,
-                'Min Date': min_date,
-                'Mean': round(mean_val, 2),
-                'Max': max_val,
-                'Max Date': max_date
-            })
-
-        # Creating a summary DataFrame
-        summary_df = pd.DataFrame(summary)
-
-        # Display the summary table
-        summary_df
-
-        # Ensure Date/Time is datetime and set as index
+    # --- Ensure Date/Time columns are in datetime format ---
         df['Date/Time'] = pd.to_datetime(df['Date/Time'])
-        df.set_index('Date/Time', inplace=True)
 
-        # Resample day-wise
-        daily_df_actual = df[['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].resample('D').mean().reset_index()
+        if not flagged.empty:
+            flagged['Date/Time'] = pd.to_datetime(flagged['Date/Time'])
 
-        # Plot
-        plt.figure(figsize=(14, 6))
-        sns.set(style="whitegrid")
+            # --- Determine flagged date boundaries ---
+            flagged_start = flagged['Date/Time'].min()
+            flagged_end = flagged['Date/Time'].max()
 
-        # Plot each trend line
-        for col in ['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']:
-            plt.plot(daily_df_actual['Date/Time'], daily_df_actual[col], label=col)
+            # --- Define plot boundaries ---
+            plot_start = flagged_start - pd.Timedelta(days=5)
+            plot_end = flagged_end + pd.Timedelta(days=10)
 
-        # Format x-axis to show only dates
-        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            print("Flagged Start Date:", flagged_start)
+            print("Flagged End Date:", flagged_end)
+            print("Plot Start Date:", plot_start)
+            print("Plot End Date:", plot_end)
 
-        plt.title('Day-wise actual Values')
-        plt.xlabel('Date')
-        plt.ylabel('Trend Value')
-        plt.legend()
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-        plt.show()
-        st.pyplot(plt)
-        # Resample day-wise
-        daily_df_trend = df[['RTD_trend', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']].resample('D').mean().reset_index()
+            # --- Filter the full DataFrame for the plotting window ---
+            plot_df = df[(df['Date/Time'] >= plot_start) & (df['Date/Time'] <= plot_end)]
 
-        # Plot
-        plt.figure(figsize=(14, 6))
-        sns.set(style="whitegrid")
+            # --- Columns to include in the plot ---
+            columns_to_plot = ['RTD_trend', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']
 
-        # Plot each trend line
-        for col in ['RTD_trend', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']:
-            plt.plot(daily_df_trend['Date/Time'], daily_df_trend[col], label=col)
+            # --- Plotting ---
+            plt.figure(figsize=(16, 8))
 
-        # Format x-axis to show only dates
-        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            for col in columns_to_plot:
+                if col in plot_df.columns:
+                    # Convert to numeric to avoid plot issues
+                    plot_df[col] = pd.to_numeric(plot_df[col], errors='coerce')
+                    plt.plot(plot_df['Date/Time'], plot_df[col], label=col)
 
-        plt.title('Day-wise Trend Values')
-        plt.xlabel('Date')
-        plt.ylabel('Trend Value')
-        plt.legend()
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-        plt.show()
-        st.pyplot(plt)
-        # Date/Time is datetime and set as index
-        flagged['Date/Time'] = pd.to_datetime(flagged['Date/Time'])
-        flagged.set_index('Date/Time', inplace=True)
+            # Format x-axis to show dates in YYYY-MM-DD format
+            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            plt.xticks(rotation=45)
 
-        # Resample day-wise
-        daily_df_actual = flagged[['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].resample('D').mean().reset_index()
+            plt.title(f"Sensor Trend Values from {plot_start.date()} to {plot_end.date()}")
+            plt.xlabel("Date")
+            plt.ylabel("Trend Values")
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
+            st.pyplot(plt)
 
-        # Plot
-        plt.figure(figsize=(14, 6))
-        sns.set(style="whitegrid")
+        else:
+            print("✅ No issue detected - your device is working properly.")
+                
+            # Feature importances
+            importances = clf.feature_importances_
+            feature_names = features
 
-        # Plot each trend line
-        for col in ['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']:
-            plt.plot(daily_df_actual['Date/Time'], daily_df_actual[col], label=col)
+            # Sort importances for better visualization (optional)
+            indices = np.argsort(importances)
+            sorted_features = [feature_names[i] for i in indices]
+            sorted_importances = importances[indices]
 
-        # Format x-axis to show only dates
-        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            # Plotting
+            plt.figure(figsize=(8, 5))
+            bars = plt.barh(sorted_features, sorted_importances, color='skyblue')
+            plt.xlabel("Feature Importance")
+            plt.title("Random Forest Feature Importance")
+            plt.tight_layout()
 
-        plt.title('Flagged Day-wise actual Values')
-        plt.xlabel('Date')
-        plt.ylabel('Trend Value')
-        plt.legend()
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-        plt.show()
-        st.pyplot(plt)
+            # Annotate bars with importance values
+            for bar in bars:
+                width = bar.get_width()
+                plt.text(width + 0.001, bar.get_y() + bar.get_height() / 2,
+                        f'{width:.2f}', va='center')
 
-        summary = f"""
-        📊 **GenAI Summary: Telemetry-Based Preventive Maintenance Analysis**
+            plt.show()
+            st.pyplot(plt)
 
-        Observation:
+            # ------------------ STEP 5: GenAI-style Summary Generation ------------------
+            total_rows = len(df)
+            print(total_rows)
+            total_issues = df['Issue_Detected'].sum()
+            print(total_issues)
+            accuracy = clf.score(X_test, y_test) * 100
+            print(accuracy,'%')
 
-        A total of {total_rows} telemetry time points were analyzed.
-        The system detected {total_issues} potential issue(s) where:
-            - TC1 was decreasing,
-            - TC10 was increasing,
-            - PUC State remained in condition 1.
-        A Random Forest Classifier trained on trend features achieved an accuracy of **{accuracy:.2f}%** on the test dataset.
-        Feature importance indicates that **TC1_trend** and **TC10_trend** are strong indicators of issue detection.
+            # List of columns you're interested in
+            # List of columns to check
+            core_columns = ['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']
+            trend_columns = [col + '_trend' for col in core_columns]
+            columns_to_check = core_columns + trend_columns
 
-        ✅ Recommended Action: 
-        For identified windows, initiate preventive checks on sensors and control logic that affect TC1 and TC10 behavior during PUC state 1.
-        """
+            # Prepare summary
+            summary = []
 
-        print(summary)
+            # Check if 'flagged' exists and is not empty
+            if 'flagged' in locals() and not flagged.empty:
+                data_source = flagged
+                source_label = "Flagged Period"
+            else:
+                data_source = df  # fallback to full data
+                source_label = "Full Dataset (No Issues Detected)"
 
-        # Rule for 1st suction compressor failure with TC1(onesuction),TC10(bphx),TC3(evapin),TC4(evapout) & state (puc state)
+            # Loop through each column and collect stats
+            for col in columns_to_check:
+                if col in data_source.columns:
+                    min_val = data_source[col].min()
+                    max_val = data_source[col].max()
+                    mean_val = data_source[col].mean()
+                    min_date = data_source.loc[data_source[col].idxmin(), 'Date/Time']
+                    max_date = data_source.loc[data_source[col].idxmax(), 'Date/Time']
 
-        st.markdown(f"""
-        <div class='output-box'>
-            <h4>🔍 Recommendation</h4>
-            <ul>
-                <li>{summary}</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
+                    summary.append({
+                        'Column': col,
+                        'Min': min_val,
+                        'Min Date': min_date,
+                        'Mean': mean_val,
+                        'Max': max_val,
+                        'Max Date': max_date
+                    })
 
-else:
-    st.info("Please upload a text file to get started.")
+            # Create and show summary DataFrame
+            summary_df = pd.DataFrame(summary)
+
+            print(f"📋 Summary Statistics ({source_label})")
+            print(summary_df)
+
+            # Ensure Date/Time is datetime and set as index
+            df['Date/Time'] = pd.to_datetime(df['Date/Time'])
+            df.set_index('Date/Time', inplace=True)
+
+            # Resample day-wise
+            daily_df_actual = df[['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].resample('D').mean().reset_index()
+
+            # Plot
+            plt.figure(figsize=(14, 6))
+            sns.set(style="whitegrid")
+
+            # Plot each trend line
+            for col in ['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']:
+                plt.plot(daily_df_actual['Date/Time'], daily_df_actual[col], label=col)
+
+            # Format x-axis to show only dates
+            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+
+            plt.title('Day-wise actual Values')
+            plt.xlabel('Date')
+            plt.ylabel('Trend Value')
+            plt.legend()
+            plt.xticks(rotation=45)
+            plt.tight_layout()
+            plt.show()
+            st.pyplot(plt)
+            # Resample day-wise
+            daily_df_trend = df[['RTD_trend', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']].resample('D').mean().reset_index()
+
+            # Plot
+            plt.figure(figsize=(14, 6))
+            sns.set(style="whitegrid")
+
+            # Plot each trend line
+            for col in ['RTD_trend', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']:
+                plt.plot(daily_df_trend['Date/Time'], daily_df_trend[col], label=col)
+
+            # Format x-axis to show only dates
+            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+
+            plt.title('Day-wise Trend Values')
+            plt.xlabel('Date')
+            plt.ylabel('Trend Value')
+            plt.legend()
+            plt.xticks(rotation=45)
+            plt.tight_layout()
+            plt.show()
+            st.pyplot(plt)
+            # Date/Time is datetime and set as index
+            # --- Check if flagged data exists and is not empty ---
+        if 'flagged' in locals() and not flagged.empty:
+            # Ensure Date/Time is datetime and set as index
+            flagged['Date/Time'] = pd.to_datetime(flagged['Date/Time'])
+            flagged.set_index('Date/Time', inplace=True)
+
+            # Resample day-wise mean
+            daily_df_actual = flagged[['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].resample('D').mean().reset_index()
+
+            # Plot
+            plt.figure(figsize=(14, 6))
+            sns.set(style="whitegrid")
+
+            for col in ['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']:
+                plt.plot(daily_df_actual['Date/Time'], daily_df_actual[col], label=col)
+
+            # Format x-axis
+            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            plt.title('📈 Flagged Day-wise Actual Values')
+            plt.xlabel('Date')
+            plt.ylabel('Trend Value')
+            plt.legend()
+            plt.xticks(rotation=45)
+            plt.tight_layout()
+            plt.show()
+            st.pyplot(plt)
+
+        else:
+            print("✅ No issue detected — your device is working properly. All investigated values lie within the expected range.")
+                
+
+            # === Extract required variables from flagged DataFrame for summary ===
+
+    # Compute sensor trend directions
+            tc1_trend = 'Decreasing' if flagged['TC1_trend'].mean() < 0 else 'Increasing'
+            tc10_trend = 'Decreasing' if flagged['TC10_trend'].mean() < 0 else 'Increasing'
+
+            # Compare average RTD vs Setpoint
+            rtd_mean = flagged['RTD'].mean()
+            setpoint_mean = flagged['Setpoint'].mean()
+            rtd_vs_setpoint_status = "RTD higher than Setpoint consistently" if rtd_mean > setpoint_mean else "RTD within expected range"
+
+            # Most common root cause from flagged data
+            if 'Trend_Flag' in flagged.columns and not flagged['Trend_Flag'].empty:
+                root_cause = flagged['Trend_Flag'].value_counts().idxmax()
+            else:
+                root_cause = "No root cause detected"
+
+            # Overall system status
+            device_status = "Issue Detected" if total_issues > 0 else "Working Well"
+
+            # === Final GenAI Summary ===
+            summary = f"""
+            📊 **GenAI Summary: Telemetry-Based Preventive Maintenance Analysis**
+
+            Observation:
+
+            A total of {total_rows} telemetry time points were analyzed.
+            The system detected {total_issues} potential issue(s) where:
+                - TC1 was {tc1_trend.lower()},
+                - TC10 was {tc10_trend.lower()},
+                - PUC State remained in condition 1.
+            A Random Forest Classifier trained on trend features achieved an accuracy of **{accuracy:.2f}%** on the test dataset.
+            Feature importance indicates that **TC1_trend** and **TC10_trend** are strong indicators of issue detection.
+
+            🔎 **Technical Evaluation Summary**
+
+            **Device Status:** {device_status}  
+            **Detected Root Cause:** {root_cause}
+
+            **Key Sensor Readings & Trends:**
+            - TC1 Trend: {tc1_trend}  
+            - TC10 Trend: {tc10_trend}  
+            - RTD vs Setpoint: {rtd_vs_setpoint_status}
+
+            🧠 **Root Cause Explanation:**  
+            The combination of a {tc1_trend.lower()} TC1 and {tc10_trend.lower()} TC10, while the system remains in state 1, suggests abnormal heat transfer or inefficiencies likely due to a **{root_cause}**. Persistent RTD elevation beyond the setpoint supports the hypothesis of system load imbalance or cooling inefficiency.
+
+            🔧 **Suggested Preventive Actions:**
+            - Schedule periodic pressure integrity tests for both compressor stages.
+            - Regularly inspect thermal coupling and ensure adequate insulation around TC1/TC10 lines.
+            - Implement alerts when TC trends diverge while PUC remains constant.
+
+            🛠 **Suggested Corrective Actions:**
+            - Conduct a diagnostic check on the suspected compressor module.
+            - Inspect and replace any worn or damaged seals that could cause internal leaks.
+            - Recalibrate sensors and verify PID control settings for thermal regulation.
+
+            ✅ **Confidence Level in Root Cause Identification:** **{accuracy:.2f}%**
+            """
+
+            # Print in console for debugging (optional)
+            print(summary)
+
+            # === Display inside styled Streamlit output box ===
+            st.markdown(f"""
+            <div class='output-box'>
+                <h4>🔍 Recommendation</h4>
+                <ul>
+                    <li>{summary}</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
