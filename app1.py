@@ -290,6 +290,16 @@ if st.session_state.show_menu:
                 # Exclude 'No issue detected' and find the label with the maximum count
                 failure_labels = count_label.drop(labels=['No issue detected - your device is working properly'], errors='ignore')
                 result = failure_labels.idxmax()
+                flagged_start = flagged['Date/Time'].min()
+                flagged_end = flagged['Date/Time'].max()
+                print("Flagged Start: ", flagged_start)
+                print("Flagged End: ", flagged_end)
+                if pd.isna(flagged_start) or pd.isna(flagged_end):
+                    result = "No issue detected - your device is working properly"
+                    print("No issue detected - your device is working properly")
+                else:
+                    print("checking: ", result)
+                    result = result
 
             # Get the suggestion based on the result
             suggestion = suggestions.get(result, "Unknown issue detected. Please investigate further.")
@@ -356,78 +366,70 @@ if st.session_state.show_menu:
             root_cause = flagged['Trend_Flag'].value_counts().idxmax() if not flagged.empty and 'Trend_Flag' in flagged.columns else "No root cause detected"
             device_status = "Issue Detected" if total_issues > 0 else "Working Well"
 
-            if device_status == "Working Well":
-    
+            if result == "No issue detected - your device is working properly":
                 summary_sugg_var = f"""
-                🧠 **Root Cause Explanation:**
-                - No root cause detected.
+            #### 🧠 Root Cause Explanation:
+            - No root cause detected.
 
-                **Suggested Preventive Actions:**
-                - No action required.
+            **Suggested Preventive Actions:**
+            - No action required.
 
-                🛠 **Suggested Corrective Actions:**
-                - No action required.
-                
-                ✅ **Confidence Level in Root Cause Identification:** **{accuracy}**""" 
-            else: 
-                
+            🛠 **Suggested Corrective Actions:**
+            - No action required.
+
+            ✅ **Confidence Level in Root Cause Identification:** **{accuracy}**
+            """
+            else:
                 summary_sugg_var = f"""
-                🧠 **Root Cause Explanation:**
-                - The combination of a {tc1_trend.lower()} 1st Suction line and {tc10_trend.lower()} Heat exchange(BPHX), while the system remains in state 1, suggests abnormal heat transfer or inefficiencies likely due to a **{root_cause}**. Persistent RTD elevation beyond the setpoint supports the hypothesis of system load imbalance or cooling inefficiency.
+            #### 🧠 Root Cause Explanation:
+            - The combination of a **{tc1_trend.lower()}** 1st Suction line and **{tc10_trend.lower()}** Heat exchange (BPHX), while the system remains in state 1, suggests abnormal heat transfer or inefficiencies likely due to a **{root_cause}**. Persistent RTD elevation beyond the setpoint supports the hypothesis of system load imbalance or cooling inefficiency.
 
-            🔧 **Suggested Preventive Actions:**
+            **🔧 Suggested Preventive Actions:**
+            - {suggestion}
+            - Schedule periodic pressure integrity tests for both compressor stages.
+            - Regularly inspect thermal coupling and ensure adequate insulation around 1st Suction line/Heat exchange (BPHX) lines.
+            - Implement alerts when TC trends diverge while PUC remains constant.
 
-                - {suggestion}
+            🛠 **Suggested Corrective Actions:**
+            - Conduct a diagnostic check on the suspected compressor module.
+            - Inspect and replace any worn or damaged seals that could cause internal leaks.
+            - Recalibrate sensors and verify PID control settings for thermal regulation.
 
-                - Schedule periodic pressure integrity tests for both compressor stages.
+            ✅ **Confidence Level in Root Cause Identification:** **{accuracy}**
+            """
 
-                - Regularly inspect thermal coupling and ensure adequate insulation around 1st Suction line/Heat exchange(BPHX) lines.
-
-                - Implement alerts when TC trends diverge while PUC remains constant.
-
-                🛠 **Suggested Corrective Actions:**
-                
-                - Conduct a diagnostic check on the suspected compressor module.
-                - Inspect and replace any worn or damaged seals that could cause internal leaks.
-                - Recalibrate sensors and verify PID control settings for thermal regulation.
-
-                 
-            ✅ **Confidence Level in Root Cause Identification:** **{accuracy}**""" 
-
-            summary = f"""
-                📊 **GenAI Summary: Telemetry-Based Preventive Maintenance Analysis**
-
-                Observation:
-
-                A total of {total_rows} telemetry time points were analyzed.
-                The system detected {total_issues} potential issue(s) where:
-                    - 1st Suction line was {tc1_trend.lower()},
-                    - Heat exchange(BPHX) was {tc10_trend.lower()},
-                    - PUC State remained in condition 1.
-                A Random Forest Classifier trained on trend features achieved an accuracy of **{accuracy}** on the test dataset.
-                Feature importance indicates that **1st Suction line Trend** and **Heat exchange(BPHX) Trend** are strong indicators of issue detection.
-
-                🔎 **Technical Evaluation Summary**
-
-                **Device Status:** {device_status}  
-                **Detected Root Cause:** {root_cause}
-
-                **Key Sensor Readings & Trends:**
-                - 1st Suction line Trend: {tc1_trend}  
-                - Heat exchange(BPHX) Trend: {tc10_trend}  
-                - RTD vs Setpoint: {rtd_vs_setpoint_status}
-
-                {summary_sugg_var}
-                """
-            print(summary)
             st.markdown(f"""
-                <div class='output-box'>
-                    <h4>🔍 Summary</h4>
-                    <ul>
-                        <li>{summary}</li>
-                    </ul>
-                </div>
-                """, unsafe_allow_html=True)
+            <div class='output-box'>
+
+            #### 📊 GenAI Summary: Telemetry-Based Preventive Maintenance Analysis
+
+            **Observation:**
+
+            A total of **{total_rows}** telemetry time points were analyzed.  
+            The system detected **{total_issues}** potential issue(s) where:
+            - 1st Suction line was **{tc1_trend.lower()}**
+            - Heat exchange (BPHX) was **{tc10_trend.lower()}**
+            - PUC State remained in condition 1.
+
+            A Random Forest Classifier trained on trend features achieved an accuracy of **{accuracy}**.  
+            Feature importance indicates that **1st Suction line Trend** and **Heat exchange(BPHX) Trend** are strong indicators of issue detection.
+
+            ---
+
+            #### 🔎 Technical Evaluation Summary
+
+            **Device Status:** {device_status}  
+            **Detected Root Cause:** **{root_cause}**
+
+            **Key Sensor Readings & Trends:**
+            - 1st Suction line Trend: **{tc1_trend}**
+            - Heat exchange(BPHX) Trend: **{tc10_trend}**
+            - RTD vs Setpoint: **{rtd_vs_setpoint_status}**
+
+            ---
+
+            {summary_sugg_var}
+            """, unsafe_allow_html=True)
 
             # Define a consistent figure size for all plots
             FIGURE_SIZE = (12, 8)
