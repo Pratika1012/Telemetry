@@ -378,6 +378,8 @@ if st.session_state.show_menu:
             - No action required.
 
             ✅ **Confidence Level in Root Cause Identification:** **{accuracy}**
+
+              **Note**:Accuracy ranges from 0 to 1, with 1 being the most accurate prediction
             """
             else:
                 summary_sugg_var = f"""
@@ -396,6 +398,8 @@ if st.session_state.show_menu:
             - Recalibrate sensors and verify PID control settings for thermal regulation.
 
             ✅ **Confidence Level in Root Cause Identification:** **{accuracy}**
+
+              **Note**:Accuracy ranges from 0 to 1, with 1 being the most accurate prediction
             """
 
             st.markdown(f"""
