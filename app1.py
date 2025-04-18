@@ -109,7 +109,7 @@ def preprocess_puc_file(file_content, columns, window=60):
     df['PUC_state_mean'] = df['PUC State'].rolling(window).mean()
     df['Diff_RTD_Setpoint_mean'] = df['Diff_RTD_Setpoint'].rolling(window).mean()
 
-    return df.dropna()
+    return df.dropna(), df_last_3_months
 
 # --- Column Names ---
 columns = [
@@ -140,7 +140,7 @@ if st.session_state.show_menu:
                 st.stop()
 
             # Preprocess data
-            new_df = preprocess_puc_file(raw_data, columns)
+            new_df, df_last_3_months = preprocess_puc_file(raw_data, columns)
             if new_df is None:
                 st.error("No valid data found in the uploaded file.")
                 st.stop()
@@ -356,7 +356,7 @@ if st.session_state.show_menu:
 
             summary_df = pd.DataFrame(summary)
             print(f"📋 Summary Statistics ({source_label})")
-            print(summary_df)
+            st.write(summary_df)
 
             tc1_trend = 'Decreasing' if flagged['TC1_trend'].mean() < 0 else 'Increasing' if not flagged.empty else 'Stable'
             tc10_trend = 'Decreasing' if flagged['TC10_trend'].mean() < 0 else 'Increasing' if not flagged.empty else 'Stable'
@@ -365,8 +365,27 @@ if st.session_state.show_menu:
             rtd_vs_setpoint_status = "RTD higher than Setpoint consistently" if rtd_mean > setpoint_mean else "RTD within expected range"
             root_cause = flagged['Trend_Flag'].value_counts().idxmax() if not flagged.empty and 'Trend_Flag' in flagged.columns else "No root cause detected"
             device_status = "Issue Detected" if total_issues > 0 else "Working Well"
+            print(root_cause)
+            state_puc = {
+                        "1st stage compression failure": (
+                            "1"
+                        ),
+                        "1st stage leakage failure": (
+                            "1"
+                        ),
+                        "1st stage Compression failure or 1st Stage Leakage Issue": ("1"),
+                        "2nd stage compression failure": (
+                            "3"
+                        ),
+                        "2nd stage leakage failure": (
+                            "3"
+                        ),
+                        "2nd stage Compression failure or 2nd Stage Leakage Issue":(
+                        "3"),
+                    }
 
-            if result == "No issue detected - your device is working properly":
+
+            if root_cause == "No root cause detected":
                 summary_sugg_var = f"""
             #### 🧠 Root Cause Explanation:
             - No root cause detected.
@@ -379,12 +398,14 @@ if st.session_state.show_menu:
 
             ✅ **Confidence Level in Root Cause Identification:** **{accuracy}**
 
-              **Note**:Accuracy ranges from 0 to 1, with 1 being the most accurate prediction
+            (Note: accuracy ranges from 0 to 1, with 1 being the most accurate prediction.)
             """
-            else:
+            elif root_cause in state_puc:
+                pucState = state_puc.get(root_cause)
+                print("PUC State: ", pucState)
                 summary_sugg_var = f"""
             #### 🧠 Root Cause Explanation:
-            - The combination of a **{tc1_trend.lower()}** 1st Suction line and **{tc10_trend.lower()}** Heat exchange (BPHX), while the system remains in state 1, suggests abnormal heat transfer or inefficiencies likely due to a **{root_cause}**. Persistent RTD elevation beyond the setpoint supports the hypothesis of system load imbalance or cooling inefficiency.
+            - The combination of a **{tc1_trend.lower()}** 1st Suction line and **{tc10_trend.lower()}** Heat exchange (BPHX), while the system remains in state {pucState}, suggests abnormal heat transfer or inefficiencies likely due to a **{root_cause}**. Persistent RTD elevation beyond the setpoint supports the hypothesis of system load imbalance or cooling inefficiency.
 
             **🔧 Suggested Preventive Actions:**
             - {suggestion}
@@ -399,7 +420,7 @@ if st.session_state.show_menu:
 
             ✅ **Confidence Level in Root Cause Identification:** **{accuracy}**
 
-              **Note**:Accuracy ranges from 0 to 1, with 1 being the most accurate prediction
+            (Note: accuracy ranges from 0 to 1, with 1 being the most accurate prediction.)
             """
 
             st.markdown(f"""
@@ -408,8 +429,9 @@ if st.session_state.show_menu:
             #### 📊 GenAI Summary: Telemetry-Based Preventive Maintenance Analysis
 
             **Observation:**
-
-            A total of **{total_rows}** telemetry time points were analyzed.  
+                        
+            Uploaded file is analyzed from {df_last_3_months['Date/Time'].min()} to {df_last_3_months['Date/Time'].max()}.
+            A total of **{total_rows}** telemetry time points were analyzed from above Date Range.  
             The system detected **{total_issues}** potential issue(s) where:
             - 1st Suction line was **{tc1_trend.lower()}**
             - Heat exchange (BPHX) was **{tc10_trend.lower()}**
@@ -451,7 +473,7 @@ if st.session_state.show_menu:
                     plot_end = flagged_end + pd.Timedelta(days=10)
 
                     plot_df = df[(df['Date/Time'] >= plot_start) & (df['Date/Time'] <= plot_end)]
-                    columns_to_plot = ['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']
+                    columns_to_plot = ['RTD','Setpoint', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']
                     plt.figure(figsize=FIGURE_SIZE)
                     for col in columns_to_plot:
                         if col in plot_df.columns:
@@ -479,7 +501,7 @@ if st.session_state.show_menu:
                     plot_end = flagged_end + pd.Timedelta(days=10)
 
                     plot_df = df[(df['Date/Time'] >= plot_start) & (df['Date/Time'] <= plot_end)]
-                    columns_to_plot = ['RTD_trend', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']
+                    columns_to_plot = ['RTD_trend','Setpoint', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']
                     plt.figure(figsize=FIGURE_SIZE)
                     for col in columns_to_plot:
                         if col in plot_df.columns:
@@ -519,10 +541,10 @@ if st.session_state.show_menu:
             with col4:
                 df['Date/Time'] = pd.to_datetime(df['Date/Time'])
                 df.set_index('Date/Time', inplace=True)
-                daily_df_actual = df[['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].resample('D').mean().reset_index()
+                daily_df_actual = df[['RTD','Setpoint', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].resample('D').mean().reset_index()
                 plt.figure(figsize=FIGURE_SIZE)
                 sns.set(style="whitegrid")
-                for col in ['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']:
+                for col in ['RTD','Setpoint', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']:
                     plt.plot(daily_df_actual['Date/Time'], daily_df_actual[col], label=col)
                 plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
                 plt.title('Daily Actual Values')
@@ -535,10 +557,10 @@ if st.session_state.show_menu:
                 plt.clf()
 
             with col5:
-                daily_df_trend = df[['RTD_trend', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']].resample('D').mean().reset_index()
+                daily_df_trend = df[['RTD_trend','Setpoint', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']].resample('D').mean().reset_index()
                 plt.figure(figsize=FIGURE_SIZE)
                 sns.set(style="whitegrid")
-                for col in ['RTD_trend', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']:
+                for col in ['RTD_trend','Setpoint', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']:
                     plt.plot(daily_df_trend['Date/Time'], daily_df_trend[col], label=col)
                 plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
                 plt.title('Daily Trend Values')
@@ -554,10 +576,10 @@ if st.session_state.show_menu:
                 if 'flagged' in locals() and not flagged.empty:
                     flagged['Date/Time'] = pd.to_datetime(flagged['Date/Time'])
                     flagged.set_index('Date/Time', inplace=True)
-                    daily_df_actual = flagged[['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].resample('D').mean().reset_index()
+                    daily_df_actual = flagged[['RTD','Setpoint', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].resample('D').mean().reset_index()
                     plt.figure(figsize=FIGURE_SIZE)
                     sns.set(style="whitegrid")
-                    for col in ['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']:
+                    for col in ['RTD','Setpoint', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']:
                         plt.plot(daily_df_actual['Date/Time'], daily_df_actual[col], label=col)
                     plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
                     plt.title('Flagged Daily Actual Values')
