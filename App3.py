@@ -10,6 +10,7 @@ import matplotlib.dates as mdates
 from sklearn.linear_model import LinearRegression
 import joblib
 import warnings
+import altair as alt
 warnings.filterwarnings(action="ignore")
 
 # --- CSS Styling for Red and White Theme ---
@@ -384,7 +385,8 @@ if st.session_state.show_menu:
                         "3"),
                     }
 
-
+            pucState = state_puc.get(root_cause)
+            print(pucState)
             if root_cause == "No root cause detected":
                 summary_sugg_var = f"""
             #### 🧠 Root Cause Explanation:
@@ -435,7 +437,7 @@ if st.session_state.show_menu:
             The system detected **{total_issues}** potential issue(s) where:
             - 1st Suction line was **{tc1_trend.lower()}**
             - Heat exchange (BPHX) was **{tc10_trend.lower()}**
-            - PUC State remained in condition 1.
+            - PUC State remained in condition {pucState}.
 
             A Random Forest Classifier trained on trend features achieved an accuracy of **{accuracy}**.  
             Feature importance indicates that **1st Suction line Trend** and **Heat exchange(BPHX) Trend** are strong indicators of issue detection.
@@ -458,137 +460,144 @@ if st.session_state.show_menu:
             """, unsafe_allow_html=True)
 
             # Define a consistent figure size for all plots
-            FIGURE_SIZE = (12, 8)
+            st.markdown("### Visualizations", unsafe_allow_html=True)
 
-            # --- Plotting Section ---
-            col1, col2, col3 = st.columns(3)
+            # Ensure Date/Time is in datetime format
+            df['Date/Time'] = pd.to_datetime(df['Date/Time'])
 
-            with col1:
-                df['Date/Time'] = pd.to_datetime(df['Date/Time'])
-                if not flagged.empty:
-                    flagged['Date/Time'] = pd.to_datetime(flagged['Date/Time'])
-                    flagged_start = flagged['Date/Time'].min()
-                    flagged_end = flagged['Date/Time'].max()
-                    plot_start = flagged_start - pd.Timedelta(days=5)
-                    plot_end = flagged_end + pd.Timedelta(days=10)
+            # Determine plot time range
+            if 'flagged' in locals() and not flagged.empty:
+                flagged['Date/Time'] = pd.to_datetime(flagged['Date/Time'])
+                flagged_start = flagged['Date/Time'].min()
+                flagged_end = flagged['Date/Time'].max()
+                plot_start = flagged_start - pd.Timedelta(days=5)
+                plot_end = flagged_end + pd.Timedelta(days=10)
+                plot_df = df[(df['Date/Time'] >= plot_start) & (df['Date/Time'] <= plot_end)].copy()
+            else:
+                plot_df = df.copy()
+                plot_start = df['Date/Time'].min()
+                plot_end = df['Date/Time'].max()
 
-                    plot_df = df[(df['Date/Time'] >= plot_start) & (df['Date/Time'] <= plot_end)]
-                    columns_to_plot = ['RTD','Setpoint', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']
-                    plt.figure(figsize=FIGURE_SIZE)
-                    for col in columns_to_plot:
-                        if col in plot_df.columns:
-                            plot_df[col] = pd.to_numeric(plot_df[col], errors='coerce')
-                            plt.plot(plot_df['Date/Time'], plot_df[col], label=col)
-                    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-                    plt.xticks(rotation=45)
-                    plt.title(f"Sensor Values ({plot_start.date()} to {plot_end.date()})")
-                    plt.xlabel("Date")
-                    plt.ylabel("Values")
-                    plt.legend()
-                    plt.tight_layout()
-                    st.pyplot(plt)
-                    plt.clf()  # Clear figure to prevent overlap
+            # Convert columns to numeric
+            for col in ['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6', 'RTD_trend', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']:
+                if col in plot_df.columns:
+                    plot_df[col] = pd.to_numeric(plot_df[col], errors='coerce')
+
+            # Reset index for Altair compatibility
+            plot_df = plot_df.reset_index(drop=True)
+
+            # Plot 1: Sensor Values
+            st.markdown("#### Sensor Values Over Time")
+            chart_data = plot_df[['Date/Time', 'RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].dropna()
+            if not chart_data.empty:
+                chart_data_melted = chart_data.melt('Date/Time', var_name='Sensor', value_name='Value')
+                chart = alt.Chart(chart_data_melted).mark_line().encode(
+                    x=alt.X('Date/Time:T', title='Date'),
+                    y=alt.Y('Value:Q', title='Values'),
+                    color='Sensor:N',
+                    tooltip=['Date/Time:T', 'Sensor:N', 'Value:Q']
+                ).properties(
+                    width=800,
+                    height=400
+                ).interactive()
+                st.altair_chart(chart, use_container_width=True)
+            else:
+                st.write("No data available for this period.")
+
+            # Plot 2: Sensor Trends
+            st.markdown("#### Sensor Trends Over Time")
+            chart_data = plot_df[['Date/Time', 'RTD_trend', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']].dropna()
+            if not chart_data.empty:
+                chart_data_melted = chart_data.melt('Date/Time', var_name='Trend', value_name='Value')
+                chart = alt.Chart(chart_data_melted).mark_line().encode(
+                    x=alt.X('Date/Time:T', title='Date'),
+                    y=alt.Y('Value:Q', title='Trend Values'),
+                    color='Trend:N',
+                    tooltip=['Date/Time:T', 'Trend:N', 'Value:Q']
+                ).properties(
+                    width=800,
+                    height=400
+                ).interactive()
+                st.altair_chart(chart, use_container_width=True)
+            else:
+                st.write("No data available for this period.")
+
+            # Plot 3: Random Forest Feature Importance
+            st.markdown("#### Random Forest Feature Importance")
+            importances = model.feature_importances_
+            feature_names = features
+            indices = np.argsort(importances)
+            sorted_features = [feature_names[i] for i in indices]
+            sorted_importances = importances[indices]
+            importance_df = pd.DataFrame({
+                'Feature': sorted_features,
+                'Importance': sorted_importances
+            })
+            chart = alt.Chart(importance_df).mark_bar().encode(
+                y=alt.Y('Feature:N', sort=None, title='Feature'),
+                x=alt.X('Importance:Q', title='Importance'),
+                tooltip=['Feature:N', 'Importance:Q']
+            ).properties(
+                width=800,
+                height=400
+            )
+            st.altair_chart(chart, use_container_width=True)
+
+            # Plot 4: Daily Actual Values
+            st.markdown("#### Daily Actual Sensor Values")
+            df.set_index('Date/Time', inplace=True)
+            daily_df_actual = df[['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].resample('D').mean().reset_index()
+            if not daily_df_actual.empty:
+                chart_data_melted = daily_df_actual.melt('Date/Time', var_name='Sensor', value_name='Value')
+                chart = alt.Chart(chart_data_melted).mark_line().encode(
+                    x=alt.X('Date/Time:T', title='Date'),
+                    y=alt.Y('Value:Q', title='Values'),
+                    color='Sensor:N',
+                    tooltip=['Date/Time:T', 'Sensor:N', 'Value:Q']
+                ).properties(
+                    width=800,
+                    height=400
+                ).interactive()
+                st.altair_chart(chart, use_container_width=True)
+            else:
+                st.write("No daily data available.")
+
+            # Plot 5: Daily Trend Values
+            st.markdown("#### Daily Sensor Trend Values")
+            daily_df_trend = df[['RTD_trend', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']].resample('D').mean().reset_index()
+            if not daily_df_trend.empty:
+                chart_data_melted = daily_df_trend.melt('Date/Time', var_name='Trend', value_name='Value')
+                chart = alt.Chart(chart_data_melted).mark_line().encode(
+                    x=alt.X('Date/Time:T', title='Date'),
+                    y=alt.Y('Value:Q', title='Trend Values'),
+                    color='Trend:N',
+                    tooltip=['Date/Time:T', 'Trend:N', 'Value:Q']
+                ).properties(
+                    width=800,
+                    height=400
+                ).interactive()
+                st.altair_chart(chart, use_container_width=True)
+            else:
+                st.write("No daily data available.")
+
+            # Plot 6: Flagged Daily Actual Values
+            st.markdown("#### Flagged Daily Actual Sensor Values")
+            if 'flagged' in locals() and not flagged.empty:
+                flagged.set_index('Date/Time', inplace=True)
+                daily_flagged = flagged[['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].resample('D').mean().reset_index()
+                if not daily_flagged.empty:
+                    chart_data_melted = daily_flagged.melt('Date/Time', var_name='Sensor', value_name='Value')
+                    chart = alt.Chart(chart_data_melted).mark_line().encode(
+                        x=alt.X('Date/Time:T', title='Date'),
+                        y=alt.Y('Value:Q', title='Values'),
+                        color='Sensor:N',
+                        tooltip=['Date/Time:T', 'Sensor:N', 'Value:Q']
+                    ).properties(
+                        width=800,
+                        height=400
+                    ).interactive()
+                    st.altair_chart(chart, use_container_width=True)
                 else:
-                    print("✅ No Issue Detected — Device Operating Normally")
-
-            with col2:
-                df['Date/Time'] = pd.to_datetime(df['Date/Time'])
-                if not flagged.empty:
-                    flagged['Date/Time'] = pd.to_datetime(flagged['Date/Time'])
-                    flagged_start = flagged['Date/Time'].min()
-                    flagged_end = flagged['Date/Time'].max()
-                    plot_start = flagged_start - pd.Timedelta(days=5)
-                    plot_end = flagged_end + pd.Timedelta(days=10)
-
-                    plot_df = df[(df['Date/Time'] >= plot_start) & (df['Date/Time'] <= plot_end)]
-                    columns_to_plot = ['RTD_trend','Setpoint', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']
-                    plt.figure(figsize=FIGURE_SIZE)
-                    for col in columns_to_plot:
-                        if col in plot_df.columns:
-                            plot_df[col] = pd.to_numeric(plot_df[col], errors='coerce')
-                            plt.plot(plot_df['Date/Time'], plot_df[col], label=col)
-                    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-                    plt.xticks(rotation=45)
-                    plt.title(f"Sensor Trends ({plot_start.date()} to {plot_end.date()})")
-                    plt.xlabel("Date")
-                    plt.ylabel("Trend Values")
-                    plt.legend()
-                    plt.tight_layout()
-                    st.pyplot(plt)
-                    plt.clf()
-                else:
-                    print("✅ No Issue Detected — Device Operating Normally")
-
-            with col3:
-                importances = model.feature_importances_
-                feature_names = features
-                indices = np.argsort(importances)
-                sorted_features = [feature_names[i] for i in indices]
-                sorted_importances = importances[indices]
-                plt.figure(figsize=FIGURE_SIZE)
-                bars = plt.barh(sorted_features, sorted_importances, color='skyblue')
-                plt.xlabel("Feature Importance")
-                plt.title("Random Forest Feature Importance")
-                for bar in bars:
-                    width = bar.get_width()
-                    plt.text(width + 0.001, bar.get_y() + bar.get_height() / 2, f'{width:.2f}', va='center')
-                plt.tight_layout()
-                st.pyplot(plt)
-                plt.clf()
-
-            col4, col5, col6 = st.columns(3)
-
-            with col4:
-                df['Date/Time'] = pd.to_datetime(df['Date/Time'])
-                df.set_index('Date/Time', inplace=True)
-                daily_df_actual = df[['RTD','Setpoint', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].resample('D').mean().reset_index()
-                plt.figure(figsize=FIGURE_SIZE)
-                sns.set(style="whitegrid")
-                for col in ['RTD','Setpoint', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']:
-                    plt.plot(daily_df_actual['Date/Time'], daily_df_actual[col], label=col)
-                plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-                plt.title('Daily Actual Values')
-                plt.xlabel('Date')
-                plt.ylabel('Value')
-                plt.legend()
-                plt.xticks(rotation=45)
-                plt.tight_layout()
-                st.pyplot(plt)
-                plt.clf()
-
-            with col5:
-                daily_df_trend = df[['RTD_trend','Setpoint', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']].resample('D').mean().reset_index()
-                plt.figure(figsize=FIGURE_SIZE)
-                sns.set(style="whitegrid")
-                for col in ['RTD_trend','Setpoint', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']:
-                    plt.plot(daily_df_trend['Date/Time'], daily_df_trend[col], label=col)
-                plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-                plt.title('Daily Trend Values')
-                plt.xlabel('Date')
-                plt.ylabel('Trend Value')
-                plt.legend()
-                plt.xticks(rotation=45)
-                plt.tight_layout()
-                st.pyplot(plt)
-                plt.clf()
-
-            with col6:
-                if 'flagged' in locals() and not flagged.empty:
-                    flagged['Date/Time'] = pd.to_datetime(flagged['Date/Time'])
-                    flagged.set_index('Date/Time', inplace=True)
-                    daily_df_actual = flagged[['RTD','Setpoint', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].resample('D').mean().reset_index()
-                    plt.figure(figsize=FIGURE_SIZE)
-                    sns.set(style="whitegrid")
-                    for col in ['RTD','Setpoint', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']:
-                        plt.plot(daily_df_actual['Date/Time'], daily_df_actual[col], label=col)
-                    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-                    plt.title('Flagged Daily Actual Values')
-                    plt.xlabel('Date')
-                    plt.ylabel('Value')
-                    plt.legend()
-                    plt.xticks(rotation=45)
-                    plt.tight_layout()
-                    st.pyplot(plt)
-                    plt.clf()
-                else:
-                    print("✅ No Issue Detected — Device Operating Normally")
+                    st.write("No flagged daily data available.")
+            else:
+                st.write("✅ No Issue Detected — Device Operating Normally")
