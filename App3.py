@@ -488,7 +488,7 @@ if st.session_state.show_menu:
 
             # Plot 1: Sensor Values
             st.markdown("#### Sensor Values Over Time")
-            chart_data = plot_df[['Date/Time', 'RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].dropna()
+            chart_data = plot_df[['Date/Time', 'RTD','Setpoint', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].dropna()
             if not chart_data.empty:
                 chart_data_melted = chart_data.melt('Date/Time', var_name='Sensor', value_name='Value')
                 chart = alt.Chart(chart_data_melted).mark_line().encode(
@@ -546,7 +546,7 @@ if st.session_state.show_menu:
             # Plot 4: Daily Actual Values
             st.markdown("#### Daily Actual Sensor Values")
             df.set_index('Date/Time', inplace=True)
-            daily_df_actual = df[['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].resample('D').mean().reset_index()
+            daily_df_actual = df[['RTD','Setpoint', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].resample('D').mean().reset_index()
             if not daily_df_actual.empty:
                 chart_data_melted = daily_df_actual.melt('Date/Time', var_name='Sensor', value_name='Value')
                 chart = alt.Chart(chart_data_melted).mark_line().encode(
