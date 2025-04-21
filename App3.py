@@ -11,24 +11,25 @@ from sklearn.linear_model import LinearRegression
 import joblib
 import warnings
 import altair as alt
+import hashlib
+
 warnings.filterwarnings(action="ignore")
 
-# --- CSS Styling for Red and White Theme ---
+# --- CSS Styling (unchanged) ---
 st.markdown("""
     <style>
     /* Styling for the main submit button */
     div.stButton > button {
-        background-color: red;  /* Red background */
-        width: 200px;           /* Adjust width */
-        height: 40px;           /* Adjust height */
-        border: none;           /* Remove border */
-        cursor: pointer;        /* Change cursor on hover */
-        border-radius: 25px;    /* Rounded corners */
-        color: white;           /* White text color */
-        border: 2px solid white; /* Border */
+        background-color: red;
+        width: 200px;
+        height: 40px;
+        border: none;
+        cursor: pointer;
+        border-radius: 25px;
+        color: white;
+        border: 2px solid white;
         margin-top: 5px;
     }
-    /* Hover effect for the buttons */
     div.stButton > button:hover {
         background-color: white;
         color: red;
@@ -40,9 +41,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- Sidebar Logo and Toggle ---
-# Replace with your logo path or URL
-logo_url = "logo1.png"  # Update with actual logo path
+# --- Sidebar Logo and Toggle (unchanged) ---
+logo_url = "logo1.png"
 st.sidebar.image(logo_url, width=200)
 
 if 'show_menu' not in st.session_state:
@@ -55,8 +55,9 @@ if st.sidebar.button("Show Telemetry Menu"):
 st.markdown("<h1 class='title'>Telemetry Analysis</h1>", unsafe_allow_html=True)
 
 # --- Preprocessing Function ---
-def preprocess_puc_file(file_content, columns, window=60):
-    raw_data = file_content.decode('utf-8')
+@st.cache_data
+def preprocess_puc_file(_file_content, columns, window=60, _file_hash=None):
+    raw_data = _file_content.decode('utf-8')
     lines = raw_data.split('\n')
     data_lines = [line for line in lines if not line.startswith('PUC_VER')]
 
@@ -112,7 +113,45 @@ def preprocess_puc_file(file_content, columns, window=60):
 
     return df.dropna(), df_last_3_months
 
-# --- Column Names ---
+# --- Model Loading ---
+@st.cache_resource
+def load_model_and_features():
+    model = joblib.load("rf_failure_model_V1404.pkl")
+    features = joblib.load("model_features_V1404.pkl")
+    return model, features
+
+# --- Visualization Data Preparation ---
+@st.cache_data
+def prepare_plot_data(df, flagged=None, _df_hash=None):
+    df = df.copy()
+    df['Date/Time'] = pd.to_datetime(df['Date/Time'])
+
+    if flagged is not None and not flagged.empty:
+        flagged = flagged.copy()
+        flagged['Date/Time'] = pd.to_datetime(flagged['Date/Time'])
+        flagged_start = flagged['Date/Time'].min()
+        flagged_end = flagged['Date/Time'].max()
+        plot_start = flagged_start - pd.Timedelta(days=5)
+        plot_end = flagged_end + pd.Timedelta(days=10)
+        plot_df = df[(df['Date/Time'] >= plot_start) & (df['Date/Time'] <= plot_end)].copy()
+    else:
+        plot_df = df.copy()
+        plot_start = df['Date/Time'].min()
+        plot_end = df['Date/Time'].max()
+
+    for col in ['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6', 'RTD_trend', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']:
+        if col in plot_df.columns:
+            plot_df[col] = pd.to_numeric(plot_df[col], errors='coerce')
+
+    plot_df = plot_df.reset_index(drop=True)
+
+    df.set_index('Date/Time', inplace=True)
+    daily_df_actual = df[['RTD', 'Setpoint', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].resample('D').mean().reset_index()
+    daily_df_trend = df[['RTD_trend', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']].resample('D').mean().reset_index()
+
+    return plot_df, daily_df_actual, daily_df_trend, flagged
+
+# --- Column Names (unchanged) ---
 columns = [
     'Date/Time', 'RTD', 'TC1', 'TC2', 'TC3', 'TC4', 'TC6', 'TC7', 'TC9', 'TC10',
     'Setpoint', 'Line Input', 'PUC State', 'User Offset', 'Warm warning setpoint', 'Cold warning setpoint',
@@ -124,7 +163,6 @@ columns = [
 # --- Main App Logic ---
 if st.session_state.show_menu:
     uploaded_file = st.file_uploader("Upload your Telemetry Data file", type=["puc"])
-    
 
     if uploaded_file is not None:
         st.success("File uploaded successfully!")
@@ -133,24 +171,22 @@ if st.session_state.show_menu:
 
             # Load model and features
             try:
-                model = joblib.load("rf_failure_model_V1404.pkl")
-                features = joblib.load("model_features_V1404.pkl")
+                model, features = load_model_and_features()
                 print("**Loaded Features**: ", features)
             except Exception as e:
                 st.error(f"Error loading model or features: {e}")
                 st.stop()
 
             # Preprocess data
-            new_df, df_last_3_months = preprocess_puc_file(raw_data, columns)
+            file_hash = hashlib.md5(raw_data).hexdigest()
+            new_df, df_last_3_months = preprocess_puc_file(raw_data, columns, _file_hash=file_hash)
             if new_df is None:
                 st.error("No valid data found in the uploaded file.")
                 st.stop()
 
-            # --- Compute Trend-Based Failure Flags ---
-            # Precompute TC3 and TC4 mean
+            # --- Compute Trend-Based Failure Flags (unchanged) ---
             tc3_tc4_mean_zero = (new_df[['TC3', 'TC4']].mean(axis=1) == 0)
 
-            # Step 2: Compute trend-based failure flags
             condition_1 = (
                 (new_df['RTD_in_range'] == False) &
                 (new_df['TC1_trend'] > 0) &
@@ -182,11 +218,9 @@ if st.session_state.show_menu:
                 (new_df['RTD_trend'] > 0)
             )
 
-            # Extended conditions with TC3 and TC4 mean = 0
             condition_1_old_device = condition_1 & tc3_tc4_mean_zero
             condition_3_old_device = condition_3 & tc3_tc4_mean_zero
 
-            # Final classification using np.select
             new_df['Trend_Flag'] = np.select(
                 [
                     condition_1_old_device,
@@ -207,7 +241,7 @@ if st.session_state.show_menu:
                 default='No issue detected - your device is working properly'
             )
 
-            # --- Flag Sustained Sequences ---
+            # --- Flag Sustained Sequences (unchanged) ---
             def flag_sustained(df, col='Trend_Flag', min_consecutive=3):
                 sustained_flags = [False] * len(df)
                 count = 0
@@ -232,7 +266,7 @@ if st.session_state.show_menu:
             total_rows = len(new_df)
             total_issues = new_df['Issue_Detected'].sum()
 
-            # --- Model Predictions ---
+            # --- Model Predictions (unchanged) ---
             X_new = new_df[features]
             predictions = model.predict(X_new)
 
@@ -250,45 +284,43 @@ if st.session_state.show_menu:
             
             new_df['Final_Label'] = new_df.apply(lambda row: row['Trend_Flag'] if row['Sustained_Issue'] else row['Prediction_Label'], axis=1)
 
-            count_label = new_df['Final_Label'].value_counts()
-            unique_count = new_df['Final_Label'].unique()
-            # Define suggestions for each label
+            # --- Suggestions and Result Logic (unchanged) ---
             suggestions = {
-                        "1st stage compression failure": (
-                            "Suggest to verify the flash sequence of the 1st stage to confirm any issue with the compressor"
-                        ),
-                        "1st stage leakage failure": (
-                            "Suggest to leak test the 1st stage to rule out any leak. Especially around condenser inler and outlet braze connections. Request them to report back the leak location to US."
-                        ),
-                        "1st stage Compression failure or 1st Stage Leakage Issue": ("Recommend checking the flash sequence of the 1st stage to confirm any compressor-related issues" or "Recommend performing a leak test on the 1st stage to eliminate the possibility of leakage, particularly near the condenser inlet and outlet braze joints. Request them to report back the leak location to US."),
-                        "2nd stage compression failure": (
-                            "suggesting an overcompensation or imbalance in the system. "
-                            "Additional Suggestions: Analyze historical temperature trends to identify patterns that may indicate potential compressor issues before they escalate. "
-                            "Perform a detailed inspection of the 2nd stage compressor wiring and connections to rule out electrical faults contributing to the failure. "
-                            "Conduct a pressure test on the 2nd stage system to detect any underlying issues that might affect the flash sequence or compressor performance."
-                        ),
-                        "2nd stage leakage failure": (
-                            "suggesting an overcompensation or imbalance in the system."
-                        ),
-                        "2nd stage Compression failure or 2nd Stage Leakage Issue":(
-                        "Indicating a possible overcompensation or system imbalance."
-                        "Further Recommendations: Review historical temperature data to uncover patterns that could signal early-stage compressor problems."
-                                                "Inspect the wiring and connections of the 2nd stage compressor thoroughly to eliminate any potential electrical faults."
-                                                "Carry out a pressure test on the 2nd stage system to uncover any hidden issues that may impact the flash sequence or the overall performance of the compressor."),
-                        "No issue detected - your device is working properly": (
-                            "No issue detected - your device is working properly. No action required."
-                        ),
-                    }
+                "1st stage compression failure": (
+                    "Suggest to verify the flash sequence of the 1st stage to confirm any issue with the compressor"
+                ),
+                "1st stage leakage failure": (
+                    "Suggest to leak test the 1st stage to rule out any leak. Especially around condenser inlet and outlet braze connections. Request them to report back the leak location to US."
+                ),
+                "1st stage Compression failure or 1st Stage Leakage Issue": (
+                    "Recommend checking the flash sequence of the 1st stage to confirm any compressor-related issues"
+                ),
+                "2nd stage compression failure": (
+                    "suggesting an overcompensation or imbalance in the system. "
+                    "Additional Suggestions: Analyze historical temperature trends to identify patterns that may indicate potential compressor issues before they escalate. "
+                    "Perform a detailed inspection of the 2nd stage compressor wiring and connections to rule out electrical faults contributing to the failure. "
+                    "Conduct a pressure test on the 2nd stage system to detect any underlying issues that might affect the flash sequence or compressor performance."
+                ),
+                "2nd stage leakage failure": (
+                    "suggesting an overcompensation or imbalance in the system."
+                ),
+                "2nd stage Compression failure or 2nd Stage Leakage Issue": (
+                    "Indicating a possible overcompensation or system imbalance."
+                    "Further Recommendations: Review historical temperature data to uncover patterns that could signal early-stage compressor problems."
+                    "Inspect the wiring and connections of the 2nd stage compressor thoroughly to eliminate any potential electrical faults."
+                    "Carry out a pressure test on the 2nd stage system to uncover any hidden issues that may impact the flash sequence or the overall performance of the compressor."
+                ),
+                "No issue detected - your device is working properly": (
+                    "No issue detected - your device is working properly. No action required."
+                ),
+            }
 
-            # Count the occurrences of each label
             count_label = new_df['Final_Label'].value_counts()
             unique_count = new_df['Final_Label'].unique()
 
-            # Determine the result
             if len(unique_count) == 1 and 'No issue detected - your device is working properly' in unique_count:
                 result = "No issue detected - your device is working properly"
             else:
-                # Exclude 'No issue detected' and find the label with the maximum count
                 failure_labels = count_label.drop(labels=['No issue detected - your device is working properly'], errors='ignore')
                 result = failure_labels.idxmax()
                 flagged_start = flagged['Date/Time'].min()
@@ -302,13 +334,12 @@ if st.session_state.show_menu:
                     print("checking: ", result)
                     result = result
 
-            # Get the suggestion based on the result
             suggestion = suggestions.get(result, "Unknown issue detected. Please investigate further.")
 
-            # Output the result and suggestion
             print(f"Result: {result}")
             print(f"Suggestion: {suggestion}")
-            # --- Evaluation Metrics ---
+
+            # --- Evaluation Metrics (unchanged) ---
             y_true = new_df['Trend_Flag']
             y_pred = new_df['Final_Label']
             accuracy = accuracy_score(y_true, y_pred)
@@ -321,23 +352,19 @@ if st.session_state.show_menu:
 
             df = new_df
 
-            # --- Summary Statistics ---
+            # --- Summary Statistics (unchanged) ---
             core_columns = ['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']
             trend_columns = [col + '_trend' for col in core_columns]
             columns_to_check = core_columns + trend_columns
 
-            # Prepare summary
             summary = []
-
-            # Check if 'flagged' exists and is not empty
             if 'flagged' in locals() and not flagged.empty:
                 data_source = flagged
                 source_label = "Flagged Period"
             else:
-                data_source = df  # fallback to full data
+                data_source = df
                 source_label = "Full Dataset (No Issues Detected)"
 
-            # Loop through each column and collect stats
             for col in columns_to_check:
                 if col in data_source.columns:
                     min_val = data_source[col].min()
@@ -366,27 +393,19 @@ if st.session_state.show_menu:
             rtd_vs_setpoint_status = "RTD higher than Setpoint consistently" if rtd_mean > setpoint_mean else "RTD within expected range"
             root_cause = flagged['Trend_Flag'].value_counts().idxmax() if not flagged.empty and 'Trend_Flag' in flagged.columns else "No root cause detected"
             device_status = "Issue Detected" if total_issues > 0 else "Working Well"
-            print(root_cause)
-            state_puc = {
-                        "1st stage compression failure": (
-                            "1"
-                        ),
-                        "1st stage leakage failure": (
-                            "1"
-                        ),
-                        "1st stage Compression failure or 1st Stage Leakage Issue": ("1"),
-                        "2nd stage compression failure": (
-                            "3"
-                        ),
-                        "2nd stage leakage failure": (
-                            "3"
-                        ),
-                        "2nd stage Compression failure or 2nd Stage Leakage Issue":(
-                        "3"),
-                    }
 
-            pucState = state_puc.get(root_cause)
-            print(pucState)
+            state_puc = {
+                "1st stage compression failure": "1",
+                "1st stage leakage failure": "1",
+                "1st stage Compression failure or 1st Stage Leakage Issue": "1",
+                "2nd stage compression failure": "3",
+                "2nd stage leakage failure": "3",
+                "2nd stage Compression failure or 2nd Stage Leakage Issue": "3",
+            }
+
+            pucState = state_puc.get(root_cause, "Unknown")
+            print("PUC State: ", pucState)
+
             if root_cause == "No root cause detected":
                 summary_sugg_var = f"""
             #### 🧠 Root Cause Explanation:
@@ -402,9 +421,7 @@ if st.session_state.show_menu:
 
             (Note: accuracy ranges from 0 to 1, with 1 being the most accurate prediction.)
             """
-            elif root_cause in state_puc:
-                pucState = state_puc.get(root_cause)
-                print("PUC State: ", pucState)
+            else:
                 summary_sugg_var = f"""
             #### 🧠 Root Cause Explanation:
             - The combination of a **{tc1_trend.lower()}** 1st Suction line and **{tc10_trend.lower()}** Heat exchange (BPHX), while the system remains in state {pucState}, suggests abnormal heat transfer or inefficiencies likely due to a **{root_cause}**. Persistent RTD elevation beyond the setpoint supports the hypothesis of system load imbalance or cooling inefficiency.
@@ -459,36 +476,16 @@ if st.session_state.show_menu:
             {summary_sugg_var}
             """, unsafe_allow_html=True)
 
-            # Define a consistent figure size for all plots
+            # --- Visualization Section ---
             st.markdown("### Visualizations", unsafe_allow_html=True)
 
-            # Ensure Date/Time is in datetime format
-            df['Date/Time'] = pd.to_datetime(df['Date/Time'])
-
-            # Determine plot time range
-            if 'flagged' in locals() and not flagged.empty:
-                flagged['Date/Time'] = pd.to_datetime(flagged['Date/Time'])
-                flagged_start = flagged['Date/Time'].min()
-                flagged_end = flagged['Date/Time'].max()
-                plot_start = flagged_start - pd.Timedelta(days=5)
-                plot_end = flagged_end + pd.Timedelta(days=10)
-                plot_df = df[(df['Date/Time'] >= plot_start) & (df['Date/Time'] <= plot_end)].copy()
-            else:
-                plot_df = df.copy()
-                plot_start = df['Date/Time'].min()
-                plot_end = df['Date/Time'].max()
-
-            # Convert columns to numeric
-            for col in ['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6', 'RTD_trend', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']:
-                if col in plot_df.columns:
-                    plot_df[col] = pd.to_numeric(plot_df[col], errors='coerce')
-
-            # Reset index for Altair compatibility
-            plot_df = plot_df.reset_index(drop=True)
+            # Compute DataFrame hash for caching
+            df_hash = hashlib.md5(pd.util.hash_pandas_object(df).tobytes()).hexdigest()
+            plot_df, daily_df_actual, daily_df_trend, flagged = prepare_plot_data(df, flagged, _df_hash=df_hash)
 
             # Plot 1: Sensor Values
             st.markdown("#### Sensor Values Over Time")
-            chart_data = plot_df[['Date/Time', 'RTD','Setpoint', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].dropna()
+            chart_data = plot_df[['Date/Time', 'RTD', 'Setpoint', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].dropna()
             if not chart_data.empty:
                 chart_data_melted = chart_data.melt('Date/Time', var_name='Sensor', value_name='Value')
                 chart = alt.Chart(chart_data_melted).mark_line().encode(
@@ -545,8 +542,6 @@ if st.session_state.show_menu:
 
             # Plot 4: Daily Actual Values
             st.markdown("#### Daily Actual Sensor Values")
-            df.set_index('Date/Time', inplace=True)
-            daily_df_actual = df[['RTD','Setpoint', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].resample('D').mean().reset_index()
             if not daily_df_actual.empty:
                 chart_data_melted = daily_df_actual.melt('Date/Time', var_name='Sensor', value_name='Value')
                 chart = alt.Chart(chart_data_melted).mark_line().encode(
@@ -564,7 +559,6 @@ if st.session_state.show_menu:
 
             # Plot 5: Daily Trend Values
             st.markdown("#### Daily Sensor Trend Values")
-            daily_df_trend = df[['RTD_trend', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']].resample('D').mean().reset_index()
             if not daily_df_trend.empty:
                 chart_data_melted = daily_df_trend.melt('Date/Time', var_name='Trend', value_name='Value')
                 chart = alt.Chart(chart_data_melted).mark_line().encode(
