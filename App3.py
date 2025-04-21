@@ -115,7 +115,7 @@ def preprocess_puc_file(_file_content, columns, window=60, _file_hash=None):
     return df.dropna(), df_last_3_months
 
 # --- Model Loading ---
-@st.cache_resource
+
 def load_model_and_features():
     model = joblib.load("rf_failure_model_V1404.pkl")
     features = joblib.load("model_features_V1404.pkl")
