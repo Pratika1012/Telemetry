@@ -56,7 +56,7 @@ if st.sidebar.button("Show Telemetry Menu"):
 st.markdown("<h1 class='title'>Telemetry Analysis</h1>", unsafe_allow_html=True)
 
 # --- Preprocessing Function ---
-@st.cache_data
+
 def preprocess_puc_file(_file_content, columns, window=60, _file_hash=None):
     raw_data = _file_content.decode('utf-8')
     lines = raw_data.split('\n')
@@ -122,7 +122,7 @@ def load_model_and_features():
     return model, features
 
 # --- Visualization Data Preparation ---
-@st.cache_data
+
 def prepare_plot_data(df, flagged=None, _df_hash=None):
     df = df.copy()
     df['Date/Time'] = pd.to_datetime(df['Date/Time'])
