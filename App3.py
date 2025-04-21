@@ -604,4 +604,4 @@ if st.session_state.show_menu:
             processing_time = end_time - start_time
             st.write(f"**Processing Time: {processing_time:.2f} seconds**")
     else:
-        st.info("Please upload a .puc file to proceed.")s
+        st.info("Please upload a .puc file to proceed.")
