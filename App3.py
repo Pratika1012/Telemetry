@@ -540,49 +540,11 @@ if st.session_state.show_menu:
             )
             st.altair_chart(chart, use_container_width=True)
 
-           st.markdown("#### Daily Actual Sensor Values")
-            df.set_index('Date/Time', inplace=True)
-            daily_df_actual = df[['RTD','Setpoint', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].resample('D').mean().reset_index()
-            if not daily_df_actual.empty:
-                chart_data_melted = daily_df_actual.melt('Date/Time', var_name='Sensor', value_name='Value')
-                chart = alt.Chart(chart_data_melted).mark_line().encode(
-                    x=alt.X('Date/Time:T', title='Date'),
-                    y=alt.Y('Value:Q', title='Values'),
-                    color='Sensor:N',
-                    tooltip=['Date/Time:T', 'Sensor:N', 'Value:Q']
-                ).properties(
-                    width=800,
-                    height=400
-                ).interactive()
-                st.altair_chart(chart, use_container_width=True)
-            else:
-                st.write("No daily data available.")
-
-            # Plot 5: Daily Trend Values
-            st.markdown("#### Daily Sensor Trend Values")
-            daily_df_trend = df[['RTD_trend', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']].resample('D').mean().reset_index()
-            if not daily_df_trend.empty:
-                chart_data_melted = daily_df_trend.melt('Date/Time', var_name='Trend', value_name='Value')
-                chart = alt.Chart(chart_data_melted).mark_line().encode(
-                    x=alt.X('Date/Time:T', title='Date'),
-                    y=alt.Y('Value:Q', title='Trend Values'),
-                    color='Trend:N',
-                    tooltip=['Date/Time:T', 'Trend:N', 'Value:Q']
-                ).properties(
-                    width=800,
-                    height=400
-                ).interactive()
-                st.altair_chart(chart, use_container_width=True)
-            else:
-                st.write("No daily data available.")
-
-            # Plot 6: Flagged Daily Actual Values
-            st.markdown("#### Flagged Daily Actual Sensor Values")
-            if 'flagged' in locals() and not flagged.empty:
-                flagged.set_index('Date/Time', inplace=True)
-                daily_flagged = flagged[['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].resample('D').mean().reset_index()
-                if not daily_flagged.empty:
-                    chart_data_melted = daily_flagged.melt('Date/Time', var_name='Sensor', value_name='Value')
+               st.markdown("#### Daily Actual Sensor Values")
+                df.set_index('Date/Time', inplace=True)
+                daily_df_actual = df[['RTD','Setpoint', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].resample('D').mean().reset_index()
+                if not daily_df_actual.empty:
+                    chart_data_melted = daily_df_actual.melt('Date/Time', var_name='Sensor', value_name='Value')
                     chart = alt.Chart(chart_data_melted).mark_line().encode(
                         x=alt.X('Date/Time:T', title='Date'),
                         y=alt.Y('Value:Q', title='Values'),
@@ -594,6 +556,44 @@ if st.session_state.show_menu:
                     ).interactive()
                     st.altair_chart(chart, use_container_width=True)
                 else:
-                    st.write("No flagged daily data available.")
-            else:
-                st.write("✅ No Issue Detected — Device Operating Normally")
+                    st.write("No daily data available.")
+    
+                # Plot 5: Daily Trend Values
+                st.markdown("#### Daily Sensor Trend Values")
+                daily_df_trend = df[['RTD_trend', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']].resample('D').mean().reset_index()
+                if not daily_df_trend.empty:
+                    chart_data_melted = daily_df_trend.melt('Date/Time', var_name='Trend', value_name='Value')
+                    chart = alt.Chart(chart_data_melted).mark_line().encode(
+                        x=alt.X('Date/Time:T', title='Date'),
+                        y=alt.Y('Value:Q', title='Trend Values'),
+                        color='Trend:N',
+                        tooltip=['Date/Time:T', 'Trend:N', 'Value:Q']
+                    ).properties(
+                        width=800,
+                        height=400
+                    ).interactive()
+                    st.altair_chart(chart, use_container_width=True)
+                else:
+                    st.write("No daily data available.")
+    
+                # Plot 6: Flagged Daily Actual Values
+                st.markdown("#### Flagged Daily Actual Sensor Values")
+                if 'flagged' in locals() and not flagged.empty:
+                    flagged.set_index('Date/Time', inplace=True)
+                    daily_flagged = flagged[['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].resample('D').mean().reset_index()
+                    if not daily_flagged.empty:
+                        chart_data_melted = daily_flagged.melt('Date/Time', var_name='Sensor', value_name='Value')
+                        chart = alt.Chart(chart_data_melted).mark_line().encode(
+                            x=alt.X('Date/Time:T', title='Date'),
+                            y=alt.Y('Value:Q', title='Values'),
+                            color='Sensor:N',
+                            tooltip=['Date/Time:T', 'Sensor:N', 'Value:Q']
+                        ).properties(
+                            width=800,
+                            height=400
+                        ).interactive()
+                        st.altair_chart(chart, use_container_width=True)
+                    else:
+                        st.write("No flagged daily data available.")
+                else:
+                    st.write("✅ No Issue Detected — Device Operating Normally")
