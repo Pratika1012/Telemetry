@@ -11,7 +11,6 @@ from sklearn.linear_model import LinearRegression
 import joblib
 import warnings
 import altair as alt
-import hashlib
 import time
 
 warnings.filterwarnings(action="ignore")
@@ -57,7 +56,7 @@ st.markdown("<h1 class='title'>Telemetry Analysis</h1>", unsafe_allow_html=True)
 
 # --- Preprocessing Function ---
 
-def preprocess_puc_file(_file_content, columns, window=60, _file_hash=None):
+def preprocess_puc_file(_file_content, columns, window=60):
     raw_data = _file_content.decode('utf-8')
     lines = raw_data.split('\n')
     data_lines = [line for line in lines if not line.startswith('PUC_VER')]
@@ -123,7 +122,7 @@ def load_model_and_features():
 
 # --- Visualization Data Preparation ---
 
-def prepare_plot_data(df, flagged=None, _df_hash=None):
+def prepare_plot_data(df, flagged=None):
     df = df.copy()
     df['Date/Time'] = pd.to_datetime(df['Date/Time'])
 
@@ -181,8 +180,8 @@ if st.session_state.show_menu:
                 st.stop()
 
             # Preprocess data
-            file_hash = hashlib.md5(raw_data).hexdigest()
-            new_df, df_last_3_months = preprocess_puc_file(raw_data, columns, _file_hash=file_hash)
+            
+            new_df, df_last_3_months = preprocess_puc_file(raw_data, columns)
             if new_df is None:
                 st.error("No valid data found in the uploaded file.")
                 st.stop()
@@ -483,9 +482,9 @@ if st.session_state.show_menu:
             # --- Visualization Section ---
             st.markdown("### Visualizations", unsafe_allow_html=True)
 
-            # Compute DataFrame hash for caching
-            df_hash = hashlib.md5(df.to_string().encode()).hexdigest()
-            plot_df, daily_df_actual, daily_df_trend, flagged = prepare_plot_data(df, flagged, _df_hash=df_hash)
+            
+            
+            plot_df, daily_df_actual, daily_df_trend, flagged = prepare_plot_data(df, flagged)
 
             # Plot 1: Sensor Values
             st.markdown("#### Sensor Values Over Time")
