@@ -546,6 +546,8 @@ if st.session_state.show_menu:
 
             # Plot 4: Daily Actual Sensor Values
             st.markdown("#### Daily Actual Sensor Values")
+            df.set_index('Date/Time', inplace=True)
+            daily_df_actual = df[['RTD','Setpoint', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].resample('D').mean().reset_index()
             if not daily_df_actual.empty:
                 chart_data_melted = daily_df_actual.melt('Date/Time', var_name='Sensor', value_name='Value')
                 chart = alt.Chart(chart_data_melted).mark_line().encode(
@@ -561,8 +563,9 @@ if st.session_state.show_menu:
             else:
                 st.write("No daily data available.")
 
-            # Plot 5: Daily Sensor Trend Values
+            # Plot 5: Daily Trend Values
             st.markdown("#### Daily Sensor Trend Values")
+            daily_df_trend = df[['RTD_trend', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']].resample('D').mean().reset_index()
             if not daily_df_trend.empty:
                 chart_data_melted = daily_df_trend.melt('Date/Time', var_name='Trend', value_name='Value')
                 chart = alt.Chart(chart_data_melted).mark_line().encode(
