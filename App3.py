@@ -12,10 +12,11 @@ import joblib
 import warnings
 import altair as alt
 import hashlib
+import time
 
 warnings.filterwarnings(action="ignore")
 
-# --- CSS Styling (unchanged) ---
+# --- CSS Styling ---
 st.markdown("""
     <style>
     /* Styling for the main submit button */
@@ -41,7 +42,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- Sidebar Logo and Toggle (unchanged) ---
+# --- Sidebar Logo and Toggle ---
 logo_url = "logo1.png"
 st.sidebar.image(logo_url, width=200)
 
@@ -151,11 +152,11 @@ def prepare_plot_data(df, flagged=None, _df_hash=None):
 
     return plot_df, daily_df_actual, daily_df_trend, flagged
 
-# --- Column Names (unchanged) ---
+# --- Column Names ---
 columns = [
     'Date/Time', 'RTD', 'TC1', 'TC2', 'TC3', 'TC4', 'TC6', 'TC7', 'TC9', 'TC10',
     'Setpoint', 'Line Input', 'PUC State', 'User Offset', 'Warm warning setpoint', 'Cold warning setpoint',
-    'Stage1 RPM', 'Stage2 RPM', 'Stage3 RPM', 'Valve Step', 
+    'Stage1 RPM', 'Stage2 RPM', 'Stage3 RPM', 'Valve Step',
     'Condenser Fan RPM', 'Algorithm Flags', 'Algo State', 'BUS RTD', 'S1 Pressure',
     'Superheat', 'S2 Temperature', 'TSat'
 ]
@@ -167,6 +168,8 @@ if st.session_state.show_menu:
     if uploaded_file is not None:
         st.success("File uploaded successfully!")
         if st.button("Submit"):
+            start_time = time.time()  # Start timer
+
             raw_data = uploaded_file.read()
 
             # Load model and features
@@ -184,7 +187,7 @@ if st.session_state.show_menu:
                 st.error("No valid data found in the uploaded file.")
                 st.stop()
 
-            # --- Compute Trend-Based Failure Flags (unchanged) ---
+            # --- Compute Trend-Based Failure Flags ---
             tc3_tc4_mean_zero = (new_df[['TC3', 'TC4']].mean(axis=1) == 0)
 
             condition_1 = (
@@ -241,7 +244,7 @@ if st.session_state.show_menu:
                 default='No issue detected - your device is working properly'
             )
 
-            # --- Flag Sustained Sequences (unchanged) ---
+            # --- Flag Sustained Sequences ---
             def flag_sustained(df, col='Trend_Flag', min_consecutive=3):
                 sustained_flags = [False] * len(df)
                 count = 0
@@ -266,7 +269,7 @@ if st.session_state.show_menu:
             total_rows = len(new_df)
             total_issues = new_df['Issue_Detected'].sum()
 
-            # --- Model Predictions (unchanged) ---
+            # --- Model Predictions ---
             X_new = new_df[features]
             predictions = model.predict(X_new)
 
@@ -281,10 +284,10 @@ if st.session_state.show_menu:
             }
             new_df['Prediction_Code'] = predictions
             new_df['Prediction_Label'] = [label_mapping.get(p, "Unknown") for p in predictions]
-            
+
             new_df['Final_Label'] = new_df.apply(lambda row: row['Trend_Flag'] if row['Sustained_Issue'] else row['Prediction_Label'], axis=1)
 
-            # --- Suggestions and Result Logic (unchanged) ---
+            # --- Suggestions and Result Logic ---
             suggestions = {
                 "1st stage compression failure": (
                     "Suggest to verify the flash sequence of the 1st stage to confirm any issue with the compressor"
@@ -339,7 +342,7 @@ if st.session_state.show_menu:
             print(f"Result: {result}")
             print(f"Suggestion: {suggestion}")
 
-            # --- Evaluation Metrics (unchanged) ---
+            # --- Evaluation Metrics ---
             y_true = new_df['Trend_Flag']
             y_pred = new_df['Final_Label']
             accuracy = accuracy_score(y_true, y_pred)
@@ -352,7 +355,7 @@ if st.session_state.show_menu:
 
             df = new_df
 
-            # --- Summary Statistics (unchanged) ---
+            # --- Summary Statistics ---
             core_columns = ['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']
             trend_columns = [col + '_trend' for col in core_columns]
             columns_to_check = core_columns + trend_columns
@@ -408,79 +411,80 @@ if st.session_state.show_menu:
 
             if root_cause == "No root cause detected":
                 summary_sugg_var = f"""
-            #### 🧠 Root Cause Explanation:
-            - No root cause detected.
+                #### 🧠 Root Cause Explanation:
+                - No root cause detected.
 
-            **Suggested Preventive Actions:**
-            - No action required.
+                **Suggested Preventive Actions:**
+                - No action required.
 
-            🛠 **Suggested Corrective Actions:**
-            - No action required.
+                🛠 **Suggested Corrective Actions:**
+                - No action required.
 
-            ✅ **Confidence Level in Root Cause Identification:** **{accuracy}**
+                ✅ **Confidence Level in Root Cause Identification:** **{accuracy}**
 
-            (Note: accuracy ranges from 0 to 1, with 1 being the most accurate prediction.)
-            """
+                (Note: accuracy ranges from 0 to 1, with 1 being the most accurate prediction.)
+                """
             else:
                 summary_sugg_var = f"""
-            #### 🧠 Root Cause Explanation:
-            - The combination of a **{tc1_trend.lower()}** 1st Suction line and **{tc10_trend.lower()}** Heat exchange (BPHX), while the system remains in state {pucState}, suggests abnormal heat transfer or inefficiencies likely due to a **{root_cause}**. Persistent RTD elevation beyond the setpoint supports the hypothesis of system load imbalance or cooling inefficiency.
+                #### 🧠 Root Cause Explanation:
+                - The combination of a **{tc1_trend.lower()}** 1st Suction line and **{tc10_trend.lower()}** Heat exchange (BPHX), while the system remains in state {pucState}, suggests abnormal heat transfer or inefficiencies likely due to a **{root_cause}**. Persistent RTD elevation beyond the setpoint supports the hypothesis of system load imbalance or cooling inefficiency.
 
-            **🔧 Suggested Preventive Actions:**
-            - {suggestion}
-            - Schedule periodic pressure integrity tests for both compressor stages.
-            - Regularly inspect thermal coupling and ensure adequate insulation around 1st Suction line/Heat exchange (BPHX) lines.
-            - Implement alerts when TC trends diverge while PUC remains constant.
+                **🔧 Suggested Preventive Actions:**
+                - {suggestion}
+                - Schedule periodic pressure integrity tests for both compressor stages.
+                - Regularly inspect thermal coupling and ensure adequate insulation around 1st Suction line/Heat exchange (BPHX) lines.
+                - Implement alerts when TC trends diverge while PUC remains constant.
 
-            🛠 **Suggested Corrective Actions:**
-            - Conduct a diagnostic check on the suspected compressor module.
-            - Inspect and replace any worn or damaged seals that could cause internal leaks.
-            - Recalibrate sensors and verify PID control settings for thermal regulation.
+                🛠 **Suggested Corrective Actions:**
+                - Conduct a diagnostic check on the suspected compressor module.
+                - Inspect and replace any worn or damaged seals that could cause internal leaks.
+                - Recalibrate sensors and verify PID control settings for thermal regulation.
 
-            ✅ **Confidence Level in Root Cause Identification:** **{accuracy}**
+                ✅ **Confidence Level in Root Cause Identification:** **{accuracy}**
 
-            (Note: accuracy ranges from 0 to 1, with 1 being the most accurate prediction.)
-            """
+                (Note: accuracy ranges from 0 to 1, with 1 being the most accurate prediction.)
+                """
 
             st.markdown(f"""
-            <div class='output-box'>
+                <div class='output-box'>
 
-            #### 📊 GenAI Summary: Telemetry-Based Preventive Maintenance Analysis
+                #### 📊 GenAI Summary: Telemetry-Based Preventive Maintenance Analysis
 
-            **Observation:**
-                        
-            Uploaded file is analyzed from {df_last_3_months['Date/Time'].min()} to {df_last_3_months['Date/Time'].max()}.
-            A total of **{total_rows}** telemetry time points were analyzed from above Date Range.  
-            The system detected **{total_issues}** potential issue(s) where:
-            - 1st Suction line was **{tc1_trend.lower()}**
-            - Heat exchange (BPHX) was **{tc10_trend.lower()}**
-            - PUC State remained in condition {pucState}.
+                **Observation:**
 
-            A Random Forest Classifier trained on trend features achieved an accuracy of **{accuracy}**.  
-            Feature importance indicates that **1st Suction line Trend** and **Heat exchange(BPHX) Trend** are strong indicators of issue detection.
+                Uploaded file is analyzed from {df_last_3_months['Date/Time'].min()} to {df_last_3_months['Date/Time'].max()}.
+                A total of **{total_rows}** telemetry time points were analyzed from above Date Range.
+                The system detected **{total_issues}** potential issue(s) where:
+                - 1st Suction line was **{tc1_trend.lower()}**
+                - Heat exchange (BPHX) was **{tc10_trend.lower()}**
+                - PUC State remained in condition {pucState}.
 
-            ---
+                A Random Forest Classifier trained on trend features achieved an accuracy of **{accuracy}**.
+                Feature importance indicates that **1st Suction line Trend** and **Heat exchange(BPHX) Trend** are strong indicators of issue detection.
 
-            #### 🔎 Technical Evaluation Summary
+                ---
 
-            **Device Status:** {device_status}  
-            **Detected Root Cause:** **{root_cause}**
+                #### 🔎 Technical Evaluation Summary
 
-            **Key Sensor Readings & Trends:**
-            - 1st Suction line Trend: **{tc1_trend}**
-            - Heat exchange(BPHX) Trend: **{tc10_trend}**
-            - RTD vs Setpoint: **{rtd_vs_setpoint_status}**
+                **Device Status:** {device_status}
+                **Detected Root Cause:** **{root_cause}**
 
-            ---
+                **Key Sensor Readings & Trends:**
+                - 1st Suction line Trend: **{tc1_trend}**
+                - Heat exchange(BPHX) Trend: **{tc10_trend}**
+                - RTD vs Setpoint: **{rtd_vs_setpoint_status}**
 
-            {summary_sugg_var}
+                ---
+
+                {summary_sugg_var}
+                </div>
             """, unsafe_allow_html=True)
 
             # --- Visualization Section ---
             st.markdown("### Visualizations", unsafe_allow_html=True)
 
             # Compute DataFrame hash for caching
-            df_hash = hashlib.md5(pd.util.hash_pandas_object(df).tobytes()).hexdigest()
+            df_hash = hashlib.md5(df.to_string().encode()).hexdigest()
             plot_df, daily_df_actual, daily_df_trend, flagged = prepare_plot_data(df, flagged, _df_hash=df_hash)
 
             # Plot 1: Sensor Values
@@ -540,11 +544,47 @@ if st.session_state.show_menu:
             )
             st.altair_chart(chart, use_container_width=True)
 
+            # Plot 4: Daily Actual Sensor Values
             st.markdown("#### Daily Actual Sensor Values")
-            df.set_index('Date/Time', inplace=True)
-            daily_df_actual = df[['RTD','Setpoint', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].resample('D').mean().reset_index()
             if not daily_df_actual.empty:
-                    chart_data_melted = daily_df_actual.melt('Date/Time', var_name='Sensor', value_name='Value')
+                chart_data_melted = daily_df_actual.melt('Date/Time', var_name='Sensor', value_name='Value')
+                chart = alt.Chart(chart_data_melted).mark_line().encode(
+                    x=alt.X('Date/Time:T', title='Date'),
+                    y=alt.Y('Value:Q', title='Values'),
+                    color='Sensor:N',
+                    tooltip=['Date/Time:T', 'Sensor:N', 'Value:Q']
+                ).properties(
+                    width=800,
+                    height=400
+                ).interactive()
+                st.altair_chart(chart, use_container_width=True)
+            else:
+                st.write("No daily data available.")
+
+            # Plot 5: Daily Sensor Trend Values
+            st.markdown("#### Daily Sensor Trend Values")
+            if not daily_df_trend.empty:
+                chart_data_melted = daily_df_trend.melt('Date/Time', var_name='Trend', value_name='Value')
+                chart = alt.Chart(chart_data_melted).mark_line().encode(
+                    x=alt.X('Date/Time:T', title='Date'),
+                    y=alt.Y('Value:Q', title='Trend Values'),
+                    color='Trend:N',
+                    tooltip=['Date/Time:T', 'Trend:N', 'Value:Q']
+                ).properties(
+                    width=800,
+                    height=400
+                ).interactive()
+                st.altair_chart(chart, use_container_width=True)
+            else:
+                st.write("No daily data available.")
+
+            # Plot 6: Flagged Daily Actual Values
+            st.markdown("#### Flagged Daily Actual Sensor Values")
+            if 'flagged' in locals() and not flagged.empty:
+                flagged.set_index('Date/Time', inplace=True)
+                daily_flagged = flagged[['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].resample('D').mean().reset_index()
+                if not daily_flagged.empty:
+                    chart_data_melted = daily_flagged.melt('Date/Time', var_name='Sensor', value_name='Value')
                     chart = alt.Chart(chart_data_melted).mark_line().encode(
                         x=alt.X('Date/Time:T', title='Date'),
                         y=alt.Y('Value:Q', title='Values'),
@@ -555,45 +595,13 @@ if st.session_state.show_menu:
                         height=400
                     ).interactive()
                     st.altair_chart(chart, use_container_width=True)
+                else:
+                    st.write("No flagged daily data available.")
             else:
-                    st.write("No daily data available.")
-    
-                # Plot 5: Daily Trend Values
-            st.markdown("#### Daily Sensor Trend Values")
-            daily_df_trend = df[['RTD_trend', 'TC1_trend', 'TC10_trend', 'TC3_trend', 'TC4_trend', 'TC6_trend']].resample('D').mean().reset_index()
-            if not daily_df_trend.empty:
-                    chart_data_melted = daily_df_trend.melt('Date/Time', var_name='Trend', value_name='Value')
-                    chart = alt.Chart(chart_data_melted).mark_line().encode(
-                        x=alt.X('Date/Time:T', title='Date'),
-                        y=alt.Y('Value:Q', title='Trend Values'),
-                        color='Trend:N',
-                        tooltip=['Date/Time:T', 'Trend:N', 'Value:Q']
-                    ).properties(
-                        width=800,
-                        height=400
-                    ).interactive()
-                    st.altair_chart(chart, use_container_width=True)
-            else:
-                    st.write("No daily data available.")
-    
-                # Plot 6: Flagged Daily Actual Values
-            st.markdown("#### Flagged Daily Actual Sensor Values")
-            if 'flagged' in locals() and not flagged.empty:
-                    flagged.set_index('Date/Time', inplace=True)
-                    daily_flagged = flagged[['RTD', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].resample('D').mean().reset_index()
-                    if not daily_flagged.empty:
-                        chart_data_melted = daily_flagged.melt('Date/Time', var_name='Sensor', value_name='Value')
-                        chart = alt.Chart(chart_data_melted).mark_line().encode(
-                            x=alt.X('Date/Time:T', title='Date'),
-                            y=alt.Y('Value:Q', title='Values'),
-                            color='Sensor:N',
-                            tooltip=['Date/Time:T', 'Sensor:N', 'Value:Q']
-                        ).properties(
-                            width=800,
-                            height=400
-                        ).interactive()
-                        st.altair_chart(chart, use_container_width=True)
-                    else:
-                        st.write("No flagged daily data available.")
-            else:
-                    st.write("✅ No Issue Detected — Device Operating Normally")
+                st.write("✅ No Issue Detected — Device Operating Normally")
+
+            end_time = time.time()  # End timer
+            processing_time = end_time - start_time
+            st.write(f"**Processing Time: {processing_time:.2f} seconds**")
+    else:
+        st.info("Please upload a .puc file to proceed.")s
