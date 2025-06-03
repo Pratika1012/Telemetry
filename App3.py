@@ -2,7 +2,6 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 from io import StringIO
-from scipy.stats import linregress
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 import matplotlib.pyplot as plt
 import seaborn as sns
