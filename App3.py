@@ -385,8 +385,7 @@ if st.session_state.show_menu:
                         "3"),
                     }
 
-            pucState = state_puc.get(root_cause)
-            print(pucState)
+
             if root_cause == "No root cause detected":
                 summary_sugg_var = f"""
             #### 🧠 Root Cause Explanation:
@@ -488,7 +487,7 @@ if st.session_state.show_menu:
 
             # Plot 1: Sensor Values
             st.markdown("#### Sensor Values Over Time")
-            chart_data = plot_df[['Date/Time', 'RTD','Setpoint', 'TC1', 'TC10', 'TC3', 'TC4', 'TC6']].dropna()
+            chart_data = plot_df[['Date/Time', 'RTD', 'Setpoint','TC1', 'TC10', 'TC3', 'TC4', 'TC6']].dropna()
             if not chart_data.empty:
                 chart_data_melted = chart_data.melt('Date/Time', var_name='Sensor', value_name='Value')
                 chart = alt.Chart(chart_data_melted).mark_line().encode(
